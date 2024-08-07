@@ -26,8 +26,19 @@ meta_output_folder = os.path.join(main_directory, "Output", "DumbDragons_Metadat
 os.makedirs(png_output_folder, exist_ok=True)
 os.makedirs(meta_output_folder, exist_ok=True)
 
+# Step 1: Count the frequency of each component
+component_types = ["scale", "wings_underbelly", "eyes", "horn", "background"]
+component_paths_lists = [Scale_paths, Wings_Underbelly_paths, Eye_paths, Horn_paths, Background_paths]
+
+component_frequencies = {}
+for component_type, component_paths in zip(component_types, component_paths_lists):
+    component_frequencies[component_type] = {}
+    for component_path in component_paths:
+        component_frequencies[component_type][component_path] = component_frequencies[component_type].get(component_path, 0) + 1
+
 # Loop for generating images
 num_images = 100
+image_infos = []  # List to store image info dictionaries
 for i in range(num_images):
     image_info = {"image_path": ""}
 
@@ -53,23 +64,36 @@ for i in range(num_images):
         print(f"Adding {layer_type} layer from {layer_path}")
         layer = Image.open(layer_path)
         base_image.paste(layer, (0, 0), layer)
+        image_info[layer_type] = layer_path  # Store the path of the used component
+
+        # Calculate and store the rarity score for each layer
+        image_info[f"{layer_type}_rarity_score"] = 1 / component_frequencies[layer_type][layer_path]
 
     # Add the outline layer
     outline_layer = Image.open(Outline_paths[0])  # Assuming only one outline is selected
     base_image.paste(outline_layer, (0, 0), outline_layer)
 
-    # Save the image
-    image_path = os.path.join(png_output_folder, f"Im_Sorry#{i}.png")
-    base_image.save(image_path)
+    # Upscale the image
+    upscaled_size = (1920, 1920)  # Define the new size
+    upscaled_image = base_image.resize(upscaled_size, Image.LANCZOS)
+
+    # Save the upscaled image
+    image_path = os.path.join(png_output_folder, f"#{i}.png")
+    upscaled_image.save(image_path)
     image_info["image_path"] = image_path
 
     # Save metadata
-    metadata_file_path = os.path.join(meta_output_folder, f"{i}_metadata.json")
+    metadata_file_path = os.path.join(meta_output_folder, f"#{i}_metadata.json")
     with open(metadata_file_path, "w") as metadata_file:
         json.dump(image_info, metadata_file, indent=4)
+
+    image_infos.append(image_info)  # Add the image info dictionary to the list
 
 # Display generated image info
 print("Generated image info:")
 for i in range(num_images):
     print(f"Image #{i}:")
-    print("Image Path:", image_info["image_path"])
+    print("Image Path:", image_infos[i]["image_path"])
+    print("Rarity Scores:")
+    for layer_type in component_types:
+        print(f"{layer_type.capitalize()}: {image_infos[i][f'{layer_type}_rarity_score']}")
